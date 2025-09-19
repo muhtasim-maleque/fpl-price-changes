@@ -5,6 +5,7 @@ analyze_transfers.py
 - calculates transfer deltas per hour
 - estimates progress towards a price rise/drop threshold
 - saves the Top 10 risers/fallers into a predictions log CSV
+- creates a summary snapshot of top 20 risers/fallers, overwritten each run
 
 Note:
 Calculation logic is simple at this stage:
@@ -19,6 +20,7 @@ from datetime import datetime, timezone
 # Input (transfers log) and output (predictions) file paths
 CSV_FILE = "fpl_transfers_log.csv"
 PRED_FILE = "fpl_predictions_log.csv"
+SUMMARY_FILE = "fpl_summary.csv"
 
 # Simple assumption ~100k net transfers trigger a price change
 # Will need to be refined later 
@@ -96,7 +98,7 @@ top_risers["type"] = "riser"
 top_droppers["timestamp"] = ts
 top_droppers["type"] = "faller"
 
-# Combine risers & fallers into one dataframe
+# Combine risers & fallers into one DataFrame
 predictions = pd.concat([top_risers, top_droppers])
 
 # Append predictions to a separate CSV log
@@ -107,3 +109,33 @@ if not pd.io.common.file_exists(PRED_FILE):
 else:
     predictions.to_csv(PRED_FILE, mode="a", header=False, index=False)
     print(f"Appended predictions to {PRED_FILE}.")
+
+# Create clean price change summary CSV
+summary = predictions.copy()
+
+# Combine rise/drop into one Progress column
+summary["Progress"] = summary["rise_progress"].fillna(0) - summary["drop_progress"].fillna(0)
+
+# Rename columns for clarity
+summary = summary.rename(columns={
+    "name": "Name",
+    "now_cost": "Price",
+    "net_delta_per_hr": "Hourly Change",
+    "timestamp": "Timestamp"
+})
+
+# Keep only clean columns
+summary = summary[["Name", "Price", "Hourly Change", "Progress", "Timestamp"]]
+
+# Pick top 20 risers and fallers by progress
+summary = summary.reindex(summary["Progress"].abs().sort_values(ascending=False).index)
+summary = summary.head(20)
+
+# Round values 
+summary["Price"] = summary["Price"].round(1)          # prices like 7.5
+summary["Hourly Change"] = summary["Hourly Change"].round(0)  # integer transfers per hour
+summary["Progress"] = summary["Progress"].round(2)    # percentage of threshold, 2 decimals
+
+# Save (overwrite each run)
+summary.to_csv(SUMMARY_FILE, index=False)
+print(f"Updated {SUMMARY_FILE} with {len(summary)} entries.")
