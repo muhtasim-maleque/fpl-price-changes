@@ -1,9 +1,9 @@
 name: FPL Transfers and Price Change
 
-on:
-  schedule:
-    - cron: "0 * * * *"   # every hour (UTC)
-  workflow_dispatch:      # allow manual trigger from GitHub UI
+#on:
+#  schedule:
+#    - cron: "0 * * * *"   # every hour (UTC)
+#  workflow_dispatch:      # allow manual trigger from GitHub UI
 
 jobs:
   run-scripts:
